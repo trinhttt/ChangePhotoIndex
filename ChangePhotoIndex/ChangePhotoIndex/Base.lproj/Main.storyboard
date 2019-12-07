@@ -28,7 +28,34 @@
                                         <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" preservesSuperviewLayoutMargins="YES" insetsLayoutMarginsFromSafeArea="NO" tableViewCell="JFl-Ae-dXU" id="msN-BM-lVZ">
                                             <rect key="frame" x="0.0" y="0.0" width="414" height="131.5"/>
                                             <autoresizingMask key="autoresizingMask"/>
+                                            <subviews>
+                                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="YcK-GA-Amz">
+                                                    <rect key="frame" x="20" y="55.5" width="42" height="21"/>
+                                                    <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                                    <nil key="textColor"/>
+                                                    <nil key="highlightedColor"/>
+                                                </label>
+                                                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="wy7-3G-WCf">
+                                                    <rect key="frame" x="374" y="11" width="30" height="65"/>
+                                                    <color key="backgroundColor" red="0.86818844080000002" green="0.2337842584" blue="0.056472718720000002" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                                    <constraints>
+                                                        <constraint firstAttribute="height" constant="65" id="U8P-Gp-Aat"/>
+                                                        <constraint firstAttribute="width" constant="30" id="odh-dL-Neq"/>
+                                                    </constraints>
+                                                    <state key="normal" title="Button"/>
+                                                </button>
+                                            </subviews>
+                                            <constraints>
+                                                <constraint firstItem="YcK-GA-Amz" firstAttribute="centerY" secondItem="msN-BM-lVZ" secondAttribute="centerY" id="Ezv-Ag-hbo"/>
+                                                <constraint firstAttribute="trailing" secondItem="wy7-3G-WCf" secondAttribute="trailing" constant="10" id="aST-JW-s7o"/>
+                                                <constraint firstItem="wy7-3G-WCf" firstAttribute="top" secondItem="msN-BM-lVZ" secondAttribute="top" constant="11" id="k1w-vp-OlF"/>
+                                                <constraint firstItem="YcK-GA-Amz" firstAttribute="leading" secondItem="msN-BM-lVZ" secondAttribute="leading" constant="20" id="s6E-yM-vaq"/>
+                                            </constraints>
                                         </tableViewCellContentView>
+                                        <connections>
+                                            <outlet property="ibButton" destination="wy7-3G-WCf" id="egn-1F-TdI"/>
+                                            <outlet property="ibLabel" destination="YcK-GA-Amz" id="ERa-ZO-0yS"/>
+                                        </connections>
                                     </tableViewCell>
                                 </prototypes>
                             </tableView>
