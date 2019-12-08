@@ -10,8 +10,10 @@ import UIKit
 
 class PreviewAndEditBookViewController: UIViewController,  UITableViewDelegate, UITableViewDataSource {
     
-    @IBOutlet weak var ibTableView: UITableView!
-    
+    @IBOutlet weak var tableView: UITableView!
+     private var snapShot: UIView?
+    private var sourceIndexPath: NSIndexPath?
+
     var itemsArray : [String]
     required init(coder aDecoder: NSCoder) {
         itemsArray = [String]()
@@ -42,152 +44,103 @@ class PreviewAndEditBookViewController: UIViewController,  UITableViewDelegate, 
     }
     override func viewDidLoad() {
         super.viewDidLoad()
-        ibTableView.delegate = self
-        ibTableView.dataSource = self
-        ibTableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        tableView.delegate = self
+        tableView.dataSource = self
+//        ibTableView.isUserInteractionEnabled = true
+//        ibTableView.isEditing true
+//        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
     }
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
+    func handleOverSizeOfTableView(position: CGFloat) -> CGFloat {
+           var positionTmp = position
+           if positionTmp <= 0 {
+               positionTmp = 1
+           } else if position >= tableView.contentSize.height {
+               positionTmp = tableView.contentSize.height - 1
+           }
+           return positionTmp
+       }
     
+    func customSnapShotFromView(inputView: UIView) -> UIImageView {
+        // Make an image from the input view.
+        UIGraphicsBeginImageContextWithOptions(inputView.bounds.size, false, 0)
+        if let graphicGetCurrentContext = UIGraphicsGetCurrentContext() {
+            inputView.layer.render(in: graphicGetCurrentContext)
+        }
+        let image = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        let snapshot = UIImageView(image: image)
+        snapshot.layer.masksToBounds = false
+        snapshot.layer.cornerRadius = 0.0
+//        snapshot.shadow(color: .blackColor(), offset: CGSize(width: -5.0, height: 0.0), opacity: 0.4, radius: 5.0)
+        return snapshot
+    }
     func longPressGestureRecognized(gestureRecognizer: UIGestureRecognizer) {
-        // Variable to store long press gesture
-        let longPress = gestureRecognizer as! UILongPressGestureRecognizer
-        
-        // Variable to save the state of long press: states such as began, changed, ended are saved
-        let state = longPress.state
-        
-        // A variable (x: 11.0, y: 13.0) that stores the long pressed position on the screen (coordinate value), changes when moved
-        let locationInView = longPress.location(in: ibTableView)
-        
-        // Store the indexPath of the selected cell ([0, 4])
-        let indexPath = ibTableView.indexPathForRow(at: locationInView)
-        
-        struct My {
-            // variable to store snapshot
-            static var cellSnapshot : UIView? = nil
-            static var cellIsAnimating : Bool = false
-            static var cellNeedToShow : Bool = false
-        }
-        struct Path {
-            // First path of cell to long press
-            static var initialIndexPath : NSIndexPath? = nil
-        }
-        
+       let state = gestureRecognizer.state
+        var location = gestureRecognizer.location(in: tableView)
+        location.y = handleOverSizeOfTableView(position: location.y)
+        guard let indexPath = tableView.indexPathForRow(at: location) else { return }
         switch state {
-        case UIGestureRecognizerState.began: // When you start pressing a cell
-            if indexPath != nil {
-                
-                // Save first path of cell to variable
-                Path.initialIndexPath = indexPath as NSIndexPath?
-                // Save snapshot of cell to variable
-                let cell = ibTableView.cellForRow(at: indexPath!) as UITableViewCell?
-                My.cellSnapshot  = snapshotOfCell(inputView: cell!)
-                
-                // Save center of cell
-                var center = cell?.center
-                
-                // To position the snapshot in the center
-                My.cellSnapshot!.center = center!
-                // Make alpha transparent by zooming to zero
-                My.cellSnapshot!.alpha = 0.0
-                
-                // Added snapshot to table view
-                ibTableView.addSubview(My.cellSnapshot!)
-                
-                // start animation effect
-                UIView.animate(withDuration: 0.25, animations: { () -> Void in
-                    
-                    // Adjust y to show finger position when snapshot
-                    center?.y = locationInView.y
-                    My.cellIsAnimating = true
-                    My.cellSnapshot!.center = center!
-                    
-                    // make the snapshot size 105%
-                    My.cellSnapshot!.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
-                    
-                    // change the alpha value of the snapshot to expose
-                    My.cellSnapshot!.alpha = 0.98
-                    
-                    // change the original cell to be invisible
-                    cell?.alpha = 0.0
-                    
-                }, completion: { (finished) -> Void in
-                    if finished {
-                        My.cellIsAnimating = false
-                        if My.cellNeedToShow {
-                            My.cellNeedToShow = false
-                            UIView.animate(withDuration: 0.25, animations: { () -> Void in
-                                cell?.alpha = 1
-                            })
-                        } else {
-                            // Change to invisible after animation
-                            cell?.isHidden = true
-                        }
-                    }
-                })
+        case .began:
+            sourceIndexPath = indexPath as NSIndexPath
+            guard let cell = tableView.cellForRow(at: indexPath) else { return }
+            // Take a snapshot of the selected row using helper method.
+            snapShot = customSnapShotFromView(inputView: cell)
+            // Add the snapshot as subview, centered at cell's center...
+            var center = cell.center
+            snapShot?.center = center
+            snapShot?.alpha = 0.0
+            guard let snapShot = snapShot else { return }
+            tableView.addSubview(snapShot)
+            UIView.animate(withDuration: 0.25,
+                animations: {
+                    // Offset for gesture location.
+                    center.y = location.y
+                    self.snapShot?.center = center
+                    self.snapShot?.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+                    self.snapShot?.alpha = 0.98
+                    cell.alpha = 0.0
+                },
+                completion: { _ in
+                    cell.isHidden = true
+            })
+        case .changed:
+            guard let snapShot = snapShot, let sourceIndexPathTmp = sourceIndexPath else { return }
+            var center = snapShot.center
+            center.y = location.y
+            snapShot.center = center
+
+            // Is destination valid and is it different from source?
+            if indexPath != sourceIndexPathTmp as IndexPath {
+                // self made exchange method
+//                exchangeObjectAtIndex(index: indexPath.row, withObjectAtIndex: sourceIndexPathTmp.row)
+                // ... move the rows.
+                tableView.moveRow(at: sourceIndexPathTmp as IndexPath, to: indexPath)
+                // ... and update source so it is in sync with UI changes.
+                sourceIndexPath = indexPath as NSIndexPath
             }
-            
-        case UIGestureRecognizerState.changed: // When we move long press
-            // The event occurs all the time by moving your finger !!
-            
-            // First there is a snapshot
-            if My.cellSnapshot != nil {
-                
-                // Store the coordinates of the snapshot
-                var center = My.cellSnapshot!.center
-                
-                // Move the y coordinate of the snapshot to the y coordinate of the finger movement. x coordinate does not move
-                center.y = locationInView.y
-                My.cellSnapshot!.center = center
-                //                print("index1: \(indexPath!)")
-                //                print("index2: \(Path.initialIndexPath! as IndexPath)")
-                if ((indexPath != nil) && (indexPath != Path.initialIndexPath! as IndexPath)) {
-                    //???? What's this, probably because array data isn't persistent data in this case doesn't seem to make sense
-                    itemsArray.insert(itemsArray.remove(at: Path.initialIndexPath!.row), at: indexPath!.row)
-                    
-                    // Change the cell of the table view. It is easier to understand that you change it every time you move.
-                    // UIGestureRecognizerState.changed event is based on indexPath of table view
-                    // i.e. when the finger's position is at the position that changes the indexPath, it immediately reverses the cell position in the actual table view
-                    // As soon as the finger moves up from cell 7 to cell 6, the positions of cells 6 and 7 are reversed.
-                    ibTableView.moveRow(at: Path.initialIndexPath! as IndexPath, to: indexPath!)
-                    // print("\(Path.initialIndexPath!.row) : \(indexPath!.row)")
-                    
-                    // The moment the event ends because the value of indexPath may change when the long press event starts and ends.
-                    // Change the path.initialIndexPath value to the indexpath value of the table view that we changed above.
-                    // Since the location of the cell has already been changed by the above event, it is necessary to change Path.initialIndexPath to work properly.
-                    Path.initialIndexPath = indexPath as NSIndexPath?
-                }
-            }
-        default: // When the long press event ends, when the finger is lifted off the screen
-            if Path.initialIndexPath != nil {
-                let cell = ibTableView.cellForRow(at: Path.initialIndexPath! as IndexPath) as UITableViewCell?
-                if My.cellIsAnimating {
-                    My.cellNeedToShow = true
-                } else {
-                    cell?.isHidden = false
-                    cell?.alpha = 0.0
-                }
-                
-                UIView.animate(withDuration: 0.25, animations: { () -> Void in
-                    // Reset Snapshot Settings
-                    My.cellSnapshot!.center = (cell?.center)!
-                    My.cellSnapshot!.transform = CGAffineTransform.identity
-                    My.cellSnapshot!.alpha = 0.0
-                    
-                    // Change alpha value of cell back to 1
-                    cell?.alpha = 1.0
-                    
-                }, completion: { (finished) -> Void in
-                    if finished {
-                        // Remove snapshot
-                        Path.initialIndexPath = nil
-                        My.cellSnapshot!.removeFromSuperview()
-                        My.cellSnapshot = nil
-                    }
-                })
-            }
+            scrollTableView()
+        default:
+            guard let sourceIndexPathTmp = sourceIndexPath else { return }
+            guard let cell = tableView.cellForRow(at: sourceIndexPathTmp as IndexPath) else { return }
+            cell.isHidden = false
+            cell.alpha = 0.0
+
+            UIView.animate(withDuration: 0.25,
+                animations: {
+                    self.snapShot?.center = cell.center
+                    self.snapShot?.transform = CGAffineTransform.identity
+                    self.snapShot?.alpha = 0.0
+                    cell.alpha = 1.0
+                },
+                completion: { _ in
+                    self.sourceIndexPath = nil
+                    self.snapShot?.removeFromSuperview()
+                    self.snapShot = nil
+            })
         }
     }
     
@@ -205,43 +158,87 @@ class PreviewAndEditBookViewController: UIViewController,  UITableViewDelegate, 
         cellSnapshot.layer.shadowOpacity = 0.4
         return cellSnapshot
     }
+    private func scrollToUp() {
+           if tableView.contentOffset.y != 0 {
+               let y = tableView.contentOffset.y - 5
+               tableView.contentOffset.y = y > 0 ? y : 0
+               if let cellSnapshot = snapShot {
+                   if cellSnapshot.frame.origin.y < tableView.contentOffset.y {
+                       scrollToUp()
+                   }
+               }
+           }
+       }
+
+       private func scrollToDown() {
+           let y = tableView.contentOffset.y + 5
+           if y + tableView.frame.height < tableView.contentSize.height {
+               tableView.contentOffset.y = y
+               if let cellSnapshot = snapShot {
+                   let contentY = tableView.contentOffset.y + tableView.frame.height
+                   if cellSnapshot.frame.origin.y < tableView.contentOffset.y {
+                       scrollToUp()
+                   } else if cellSnapshot.frame.origin.y + cellSnapshot.frame.height > contentY && tableView.contentOffset.y + tableView.frame.height < tableView.contentSize.height {
+                       scrollToDown()
+                   }
+               }
+           }
+       }
     
+    private func scrollTableView() {
+          guard let snapShot = snapShot else { return }
+          let contentY = tableView.contentOffset.y + tableView.frame.height
+          if snapShot.frame.origin.y < tableView.contentOffset.y {
+              scrollToUp()
+          } else if snapShot.frame.origin.y + snapShot.frame.height > contentY && tableView.contentOffset.y + tableView.frame.height < tableView.contentSize.height {
+              scrollToDown()
+          }
+      }
     // MARK: - Table view data source
-    
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return itemsArray.count
     }
-    
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = ibTableView.dequeueReusableCell(withIdentifier: "PreviewAndEditTableViewCell", for: indexPath as IndexPath) as! PreviewAndEditTableViewCell
+        let cell = tableView.dequeueReusableCell(withIdentifier: "PreviewAndEditTableViewCell", for: indexPath as IndexPath) as! PreviewAndEditTableViewCell
 
         cell.longTapHandle = { gestureRecognizer in
             self.longPressGestureRecognized(gestureRecognizer: gestureRecognizer)
+//            TableViewCellProvider.shared.longPressGestureRecognized(gestureRecognizer: gestureRecognizer, tableView: self.ibTableView) { (sourceIndex, destinationIndex) in
+//                print(self.itemsArray)
+//
+//                let movedObject = self.itemsArray[sourceIndex]
+//                self.itemsArray.remove(at: sourceIndex)
+//                self.itemsArray.insert(movedObject, at: destinationIndex)
+//                print(self.itemsArray)
+////                self.ibTableView.reloadData()
+//            }
         }
         cell.ibLabel.text = "\(indexPath.row) \(itemsArray[indexPath.row])"
         return cell
     }
-    
+
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        ibTableView.deselectRow(at: indexPath as IndexPath, animated: false)
+        tableView.deselectRow(at: indexPath as IndexPath, animated: false)
     }
-    
+
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 150
     }
 }
 
 
-////Reorder hold all cell
-//extension PreviewAndEditBookViewController: UITableViewDelegate, UITableViewDataSource {
+//Reorder hold all cell
+//extension PreviewAndEditBookViewController {
 //    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-//        return objects.count
+//        return itemsArray.count
 //    }
 //
 //    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
 //        if let cell = ibTableView.dequeueReusableCell(withIdentifier: "PreviewAndEditTableViewCell", for: indexPath) as? PreviewAndEditTableViewCell {
 //            cell.backgroundColor = .yellow
-//            cell.textLabel?.text = objects[indexPath.row]
+//            cell.textLabel?.text = itemsArray[indexPath.row]
 //            return cell
 //        }
 //        return UITableViewCell()
@@ -259,9 +256,9 @@ class PreviewAndEditBookViewController: UIViewController,  UITableViewDelegate, 
 //        return false
 //    }
 //     func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
-//        let movedObject = self.objects[sourceIndexPath.row]
-//        objects.remove(at: sourceIndexPath.row)
-//        objects.insert(movedObject, at: destinationIndexPath.row)
+//        let movedObject = self.itemsArray[sourceIndexPath.row]
+//        itemsArray.remove(at: sourceIndexPath.row)
+//        itemsArray.insert(movedObject, at: destinationIndexPath.row)
 //    }
 //
 //    // Change default icon (hamburger) for moving cells in UITableView
